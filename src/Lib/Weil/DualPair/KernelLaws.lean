@@ -67,7 +67,9 @@ omit [WeilData E] in
 @[simp]
 lemma Modulus.factor_reductionGL {𝔪 𝔫 : Modulus E} {h : 𝔫.ideal ≤ 𝔪.ideal} {k : stdLevel E n} :
     (reductionGL 𝔫 k).val.map (factor h) = (reductionGL 𝔪 k).val :=
-  Matrix.ext fun i j ↦ by simp [reductionGL]
+  Matrix.ext fun i j ↦ by
+    rw [Matrix.map_apply, reductionGL, reductionGL, stdLevel.map_apply, stdLevel.map_apply,
+      𝔪.factor_reduction _ h]
 
 /-- The theta kernel θ^{S,I}_{a,b}[Ψ, P](g, (1, h)), where I is the standard space I_{n′} of rank n′
 and h lies in its finite adelic unitary group. -/
@@ -89,15 +91,34 @@ abbrev renameRowsCols {ι a b c d : Type*} (e : a → c) (f : b → d) :
 
 /-! ### Bilinearity, twisting, integral translations and seesaw identities -/
 
+private lemma modDatum_smul (c : ℂ) (Ψ : Matrix n' n 𝔪.ResidueRing → ℂ)
+    (v : Heisenberg.IsVacuum.Model (realHeisenberg (realSigns E (homSigns s s')))) :
+    modDatum S T 𝔪 (c • Ψ) v = c • modDatum S T 𝔪 Ψ v := by
+  rw [modDatum, modDatum, Pi.smul_comp, 𝔪.liftFn.map_smul,
+    ((S.hom T).schrodingerOp 𝔪.places).map_smul, _root_.smul_apply,
+    ((S.hom T).integrated v).map_smul]
+
 /-- The value θ^{S,T}_{a,b}[Ψ, P](g, h) of the theta kernel as a complex bilinear form in the
 function Ψ modulo 𝔪 and the polynomial P. -/
 def modKernelBilin (g : G E s) (h : G E s') :
     (Matrix n' n 𝔪.ResidueRing → ℂ) →ₗ[ℂ] MvPolynomial (InfinitePlace E × n' × n) ℂ →ₗ[ℂ] ℂ :=
   LinearMap.mk₂ ℂ (fun Ψ P ↦ modKernel S T a b 𝔪 Ψ P g h)
-    (fun Ψ Ψ' P ↦ by simp [modKernel, pairTheta, modDatum, Pi.add_comp])
-    (fun c Ψ P ↦ by simp [modKernel, pairTheta, modDatum, Pi.smul_comp])
-    (fun Ψ P P' ↦ by simp [modKernel, pairTheta, modDatum])
-    (fun c Ψ P ↦ by simp [modKernel, pairTheta, modDatum])
+    (fun Ψ Ψ' P ↦ by
+      rw [modKernel, modKernel, modKernel, pairTheta, pairTheta, pairTheta, modDatum, modDatum,
+        modDatum, Pi.add_comp, 𝔪.liftFn.map_add, ((S.hom T).schrodingerOp 𝔪.places).map_add,
+        _root_.add_apply, ((S.hom T).integrated _).map_add,
+        (pairWeil S T a b (g, h)).map_add, (S.hom T).θ.map_add])
+    (fun c Ψ P ↦ by
+      rw [modKernel, modKernel, pairTheta, pairTheta, modDatum_smul,
+        (pairWeil S T a b (g, h)).map_smul, (S.hom T).θ.map_smul])
+    (fun Ψ P P' ↦ by
+      rw [modKernel, modKernel, modKernel, pairTheta, pairTheta, pairTheta, modDatum, modDatum,
+        modDatum, (polyVector _).map_add, (S.hom T).integrated.map_add,
+        _root_.add_apply, (pairWeil S T a b (g, h)).map_add, (S.hom T).θ.map_add])
+    (fun c Ψ P ↦ by
+      rw [modKernel, modKernel, pairTheta, pairTheta, modDatum, modDatum, (polyVector _).map_smul,
+        (S.hom T).integrated.map_smul, _root_.smul_apply,
+        (pairWeil S T a b (g, h)).map_smul, (S.hom T).θ.map_smul])
 
 @[simp]
 lemma modKernelBilin_apply (g : G E s) (h : G E s') (Ψ : Matrix n' n 𝔪.ResidueRing → ℂ)
@@ -112,9 +133,13 @@ lemma pairWeil_twist (μ μ' : AutChar E) (g : G E s) (h : G E s') :
       ((μ.val h.det : ℂ) / (μ'.val g.det : ℂ)) • pairWeil S T a b (g, h) := by
   have h_char : pairChar (a * μ) (b * μ') (g, h) =
       μ.val h.det / μ'.val g.det * pairChar a b (g, h) := by
-    simp [field]
+    rw [pairChar_apply, pairChar_apply]
+    change ((a.val h.det : ℂ) * (μ.val h.det : ℂ)) *
+        ((b.val g.det : ℂ) * (μ'.val g.det : ℂ))⁻¹ = _
+    rw [mul_inv, div_eq_mul_inv]
+    ring
   ext f
-  simp [pairWeil_apply, h_char, mul_smul]
+  rw [_root_.smul_apply, pairWeil_apply, pairWeil_apply, h_char, mul_smul]
 
 /-- For hermitian spaces `S` and `T`, characters `a`, `b`, `μ`, `μ'` in `AutChar E`, a test
 function `f` in `𝒮 (S.hom T)`, and unitary group elements `g : G E s` and `h : G E s'`:
@@ -123,7 +148,7 @@ multiplies its value at `(g, h)` by `μ (det h) / μ' (det g)`. -/
 lemma pairTheta_twist (μ μ' : AutChar E) (f : 𝒮 (S.hom T)) (g : G E s) (h : G E s') :
     pairTheta S T (a * μ) (b * μ') f (g, h) =
       μ.val h.det / μ'.val g.det * pairTheta S T a b f (g, h) := by
-  simp [pairTheta, pairWeil_twist]
+  rw [pairTheta, pairTheta, pairWeil_twist, _root_.smul_apply, (S.hom T).θ.map_smul, smul_eq_mul]
 
 /-- Twisting the characters: for characters μ, μ′ of [U(1)], θ_{aμ,bμ′}[Ψ,P](g,h) = μ(det h)
 μ′(det g)⁻¹ θ_{a,b}[Ψ,P](g,h), for all Ψ modulo 𝔪, polynomials P, and g, h. -/
@@ -143,21 +168,47 @@ lemma pairWeil_modDatum_stdLevel (k : stdLevel E n) (k' : stdLevel E n')
       (a.val (detFin s' k'.val) * (b.val (detFin s k.val))⁻¹).val •
         modDatum S T 𝔪 (fun x : Matrix n' n 𝔪.ResidueRing ↦
           Ψ ((𝔪.reductionGL k')⁻¹.val * x * (𝔪.reductionGL k).val)) v := by
-  classical
   -- The pair is integral, so it acts on the vacuum by the stated character value.
   have h_vac : pairWeil S T a b ((1, k.val), 1, k'.val) (S.hom T).vacElem =
       (a.val (detFin s' k'.val) * (b.val (detFin s k.val))⁻¹).val • (S.hom T).vacElem :=
-    pairWeil_eq_smul_of_projOn_eq ⊤ (by simp) (by simp) (by simp)
+    pairWeil_eq_smul_of_projOn_eq ⊤ (S.hom T).projOn_vacElem
+      ⟨k.2, Gf.mem_supportedOn.2 fun _ h _ ↦ (h trivial).elim⟩
+      ⟨k'.2, Gf.mem_supportedOn.2 fun _ h _ ↦ (h trivial).elim⟩
   -- Reduction modulo `𝔪` commutes with `x ↦ k'⁻¹ x k`.
+  have h_eq (F : Matrix n' n 𝔪.ResidueRing → ℂ) (y : n' × n → 𝔸f E) :
+      𝔪.liftFn (F ∘ vecToMatrix) y =
+        liftIntegralFn 𝔪.reduction F (idem 𝔪.places • vecToMatrix y) := by
+    rw [liftFn_apply]
+    by_cases hy : ∀ i : n' × n, idem 𝔪.places * y i ∈ Ô E
+    · rw [dite_eq_left hy]
+      have hM : idem 𝔪.places • vecToMatrix y =
+          (Matrix.of fun i j ↦ (⟨idem 𝔪.places * y (i, j), hy (i, j)⟩ : Ô E)).map
+            (Ô E).subtype := Matrix.ext fun _ _ ↦ rfl
+      rw [hM, liftIntegralFn_map_subtype]
+      rfl
+    · rw [dite_eq_right hy, liftIntegralFn_of_not_isIntMatrix (M := idem 𝔪.places • vecToMatrix y)
+        _ _ fun h ↦ hy fun ⟨i, j⟩ ↦ h i j]
+  have hk' : ((stdLevel.map n' (.id _) k'⁻¹).map 𝔪.reduction).val = (𝔪.reductionGL k')⁻¹.val :=
+    congrArg Units.val (by
+      rw [show (𝔪.reductionGL k')⁻¹ = 𝔪.reductionGL k'⁻¹ from (map_inv 𝔪.reductionGL k').symm]
+      exact Units.ext (Matrix.ext fun _ _ ↦ rfl))
+  have hk : ((stdLevel.map n (.id _) k).map 𝔪.reduction).val = (𝔪.reductionGL k).val :=
+    Matrix.ext fun _ _ ↦ rfl
   have h_lift : (fun x : n' × n → 𝔸f E ↦ 𝔪.liftFn (Ψ ∘ vecToMatrix)
         (matrixToVec ((k'.val⁻¹ : Gf E n').val.val * vecToMatrix x * k.val.val.val))) =
       𝔪.liftFn ((fun X : Matrix n' n 𝔪.ResidueRing ↦
         Ψ ((𝔪.reductionGL k')⁻¹.val * X * (𝔪.reductionGL k).val)) ∘ vecToMatrix) := by
     funext x
-    -- `using!`: identifying the matrices with `stdLevel.map (RingHom.id _)` unfolds `stdLevel.map`.
-    simpa [↓ liftFn_apply] using!
-      liftIntegralFn_mul (M := idem 𝔪.places • vecToMatrix x) _ _ (stdLevel.map _ (.id _) k)
-        (stdLevel.map _ (.id _) k'⁻¹)
+    rw [h_eq, h_eq]
+    have h_mat : idem 𝔪.places • ((k'.val⁻¹ : Gf E n').val.val * vecToMatrix x * k.val.val.val) =
+        ((stdLevel.map n' (.id _) k'⁻¹).map (Ô E).subtype).val *
+          (idem 𝔪.places • vecToMatrix x) *
+          ((stdLevel.map n (.id _) k).map (Ô E).subtype).val := by
+      rw [← Matrix.smul_mul, ← Matrix.mul_smul]
+      rfl
+    change liftIntegralFn 𝔪.reduction Ψ
+        (idem 𝔪.places • ((k'.val⁻¹ : Gf E n').val.val * vecToMatrix x * k.val.val.val)) = _
+    rw [h_mat, liftIntegralFn_mul, hk', hk]
   -- The pair is trivial at infinity, so it acts only on the finite datum: it replaces the lift of
   -- `Ψ` by its translate under `x ↦ k'⁻¹ x k` and scales the vacuum.
   rw [modDatum, pairWeil_integrated_fin,
@@ -178,10 +229,20 @@ lemma modKernel_mul_stdLevel_left (k : stdLevel E n) (Ψ : Matrix n' n 𝔪.Resi
   have h_act (v : Heisenberg.IsVacuum.Model (realHeisenberg (realSigns E (homSigns s s')))) :
       pairWeil S T a b ((1, k.val), 1) (modDatum S T 𝔪 Ψ v) = modDatum S T 𝔪
         ((b.val (detFin s k.val) : ℂ)⁻¹ • fun x ↦ Ψ (x * (𝔪.reductionGL k).val)) v := by
-    simpa [Prod.mk_one_one, modDatum, Pi.smul_comp] using pairWeil_modDatum_stdLevel S T a b 𝔪 k 1 Ψ
-      v
+    have h := pairWeil_modDatum_stdLevel S T a b 𝔪 k 1 Ψ v
+    rw [show ((1 : GInf E s'), (1 : stdLevel E n').val) = (1 : G E s') from Prod.mk_one_one] at h
+    have hc : (a.val (detFin s' (1 : stdLevel E n').val) * (b.val (detFin s k.val))⁻¹).val =
+        (b.val (detFin s k.val) : ℂ)⁻¹ := by
+      change (a.val (G.det (1 : G E s')) * (b.val (detFin s k.val))⁻¹).val = _
+      rw [map_one, map_one, one_mul]
+      rfl
+    have hΨ : (fun x : Matrix n' n 𝔪.ResidueRing ↦
+          Ψ ((𝔪.reductionGL (1 : stdLevel E n'))⁻¹.val * x * (𝔪.reductionGL k).val)) =
+        fun x ↦ Ψ (x * (𝔪.reductionGL k).val) :=
+      funext fun x ↦ by rw [map_one, inv_one, Units.val_one, Matrix.one_mul]
+    rw [h, hc, hΨ, modDatum_smul]
   rw [modKernel, modKernel, ← h_act, ← pairTheta_mul]
-  simp
+  simp only [Prod.mk_mul_mk, mul_one]
 
 /-- Let `modKernel S T a b 𝔪 Ψ P` be the theta kernel (g, h) ↦ θ(ω_{a,b}(g, h) f) on the adelic
 unitary groups of `S` and `T`, where the datum f is built from a function `Ψ` on n′ × n matrices
@@ -197,10 +258,19 @@ lemma modKernel_mul_stdLevel_right (k : stdLevel E n') (Ψ : Matrix n' n 𝔪.Re
   have h_act (v : Heisenberg.IsVacuum.Model (realHeisenberg (realSigns E (homSigns s s')))) :
       pairWeil S T a b (1, 1, k.val) (modDatum S T 𝔪 Ψ v) = modDatum S T 𝔪
         ((a.val (detFin s' k.val) : ℂ) • fun y ↦ Ψ ((𝔪.reductionGL k)⁻¹.val * y)) v := by
-    simpa [Prod.mk_one_one, modDatum, Pi.smul_comp] using pairWeil_modDatum_stdLevel S T a b 𝔪 1 k Ψ
-      v
+    have h := pairWeil_modDatum_stdLevel S T a b 𝔪 1 k Ψ v
+    rw [show ((1 : GInf E s), (1 : stdLevel E n).val) = (1 : G E s) from Prod.mk_one_one] at h
+    have hc : (a.val (detFin s' k.val) * (b.val (detFin s (1 : stdLevel E n).val))⁻¹).val =
+        (a.val (detFin s' k.val) : ℂ) := by
+      change (a.val (detFin s' k.val) * (b.val (G.det (1 : G E s)))⁻¹).val = _
+      rw [map_one, map_one, inv_one, mul_one]
+    have hΨ : (fun y : Matrix n' n 𝔪.ResidueRing ↦
+          Ψ ((𝔪.reductionGL k)⁻¹.val * y * (𝔪.reductionGL (1 : stdLevel E n)).val)) =
+        fun y ↦ Ψ ((𝔪.reductionGL k)⁻¹.val * y) :=
+      funext fun y ↦ by rw [map_one, Units.val_one, Matrix.mul_one]
+    rw [h, hc, hΨ, modDatum_smul]
   rw [modKernel, modKernel, ← h_act, ← pairTheta_mul]
-  simp
+  simp only [Prod.mk_mul_mk, mul_one]
 
 omit [DecidableEq n] [DecidableEq n₁] [DecidableEq n₂] [WeilData E] in
 /-- Along a splitting `e` of the coordinates, the lift `liftFn` to finite adelic vectors (Φ of the
@@ -210,13 +280,23 @@ lemma Modulus.liftFn_mul_blocks (e : n₁ ⊕ n₂ ≃ n) (Φ₁ : (n₁ → �
     (Φ₂ : (n₂ → 𝔪.ResidueRing) → ℂ) :
     𝔪.liftFn (fun y : n → 𝔪.ResidueRing ↦ Φ₁ (y ∘ e ∘ Sum.inl) * Φ₂ (y ∘ e ∘ Sum.inr)) =
       fun x : n → 𝔸f E ↦ 𝔪.liftFn Φ₁ (x ∘ e ∘ Sum.inl) * 𝔪.liftFn Φ₂ (x ∘ e ∘ Sum.inr) := by
+  have _ : Nonempty (Fintype n₁) ∧ Nonempty (Fintype n₂) := ⟨⟨inferInstance⟩, ⟨inferInstance⟩⟩
   funext x
   -- `x` is integral at `𝔪.places` exactly when both blocks are
   have h_int : (∀ i : n, idem 𝔪.places * x i ∈ Ô E) ↔
-      (∀ i : n₁, idem 𝔪.places * x (e (.inl i)) ∈ Ô E) ∧
-        ∀ i : n₂, idem 𝔪.places * x (e (.inr i)) ∈ Ô E := by rw [← e.forall_congr_right, Sum.forall]
-  simp only [liftFn_apply, comp_def]
-  split_ifs <;> simp_all
+      (∀ i : n₁, idem 𝔪.places * (x ∘ e ∘ Sum.inl) i ∈ Ô E) ∧
+        ∀ i : n₂, idem 𝔪.places * (x ∘ e ∘ Sum.inr) i ∈ Ô E := by
+    rw [← e.forall_congr_right, Sum.forall]
+    rfl
+  rw [liftFn_apply, liftFn_apply, liftFn_apply]
+  by_cases hx : ∀ i : n, idem 𝔪.places * x i ∈ Ô E
+  · obtain ⟨hx₁, hx₂⟩ := h_int.1 hx
+    rw [dite_eq_left hx, dite_eq_left hx₁, dite_eq_left hx₂]
+    rfl
+  · rw [dite_eq_right hx]
+    rcases not_and_or.1 (mt h_int.2 hx) with hx₁ | hx₂
+    · rw [dite_eq_right hx₁, zero_mul]
+    · rw [dite_eq_right hx₂, mul_zero]
 
 /-- Let `e` split the coordinates of `S` into those of `V₁` and `V₂`, compatibly with the signs.
 Take on each `Vᵢ` the datum given by the Fock vector of a polynomial `Pᵢ`, a function `Φᵢ` modulo
@@ -283,7 +363,9 @@ lemma modKernel_sum_right (b' : AutChar E) (Ψ : Matrix n' n 𝔪.ResidueRing �
         (renameRowsCols Sum.inl id P * renameRowsCols Sum.inr id P') g (G.sum (h, h')) =
       modKernel S T a b 𝔪 Ψ P g h * modKernel S V a b' 𝔪 Ψ' P' g h' :=
   -- The point of `T.sum V` and `G.sum (h, h')` are block diagonal along the identity splitting.
-  modKernel_block_right S (T.sum V) a b 𝔪 signs_comp_refl (by aesop) (by aesop) b' Ψ Ψ' P P' g
+  modKernel_block_right S (T.sum V) a b 𝔪 signs_comp_refl
+    (by rw [Equiv.coe_refl, submatrix_id_id]; rfl)
+    (by rw [Equiv.coe_refl, submatrix_id_id, G.adeleMatrix_sum]) b' Ψ Ψ' P P' g
 
 /-- For a modulus 𝔪, a function Ψ on `n' × n` matrices over O_E/𝔪 and a polynomial P in variables
 indexed by (infinite place, row, column), the theta kernel θ^{S,T}_{a,b}[Ψ,P](g,h) = θ(ω_{a,b}(g,h)
@@ -333,13 +415,22 @@ lemma map_negSource_modDatum (Ψ : Matrix n' n 𝔪.ResidueRing → ℂ)
   -- The real part: negating the signs conjugates the holomorphic coordinates.
   have h_real : negSource.realMap (polyVector (realSigns E (homSigns s s')) P) =
       polyVector (realSigns E (homSigns (-s) s')) (MvPolynomial.map conj P) := by
+    have h_sign_neg (i : InfinitePlace E × n' × n) :
+        realSigns E (homSigns (-s) s') i = -realSigns E (homSigns s s') i := by
+      simp only [realSigns, homSigns, pairSign, Pi.neg_apply, mul_neg]
     ext x
     have h_coord : conj ∘ holomorphicCoord (realSigns E (homSigns s s')) x =
         holomorphicCoord (realSigns E (homSigns (-s) s')) x := funext fun i ↦ by
-      rcases Int.units_eq_one_or (realSigns E (homSigns s s') i) with h_sign | h_sign <;>
-        simp_all [holomorphicCoord_eq, pairSign]
-    simp [CoordChange.realMap, negSource, (isVacuum_realVac (ε := 1)).conj_apply x, map_eval,
-      h_coord]
+      simp only [Function.comp_apply, holomorphicCoord_eq, h_sign_neg]
+      rcases Int.units_eq_one_or (realSigns E (homSigns s s') i) with h_sign | h_sign
+      · rw [h_sign, ite_eq_left rfl, ite_eq_right (by decide), Pi.star_apply, Complex.star_def,
+          starRingEnd_self_apply]
+      · rw [h_sign, ite_eq_right (by decide), neg_neg, ite_eq_left rfl]
+        rfl
+    change conj (polyVector (realSigns E (homSigns s s')) P x) =
+      polyVector (realSigns E (homSigns (-s) s')) (MvPolynomial.map conj P) x
+    rw [polyVector_apply, polyVector_apply, map_mul, (isVacuum_realVac (ε := 1)).conj_apply x,
+      ← h_coord, map_eval]
   -- The finite part: `negSource` scales by the unit `normNegOne⁻¹` of `Ô`, which keeps integrality
   -- and reduces to `𝔪.normNegOne⁻¹`.
   have h_fin : (fun x : n' × n → 𝔸f E ↦
@@ -349,14 +440,25 @@ lemma map_negSource_modDatum (Ψ : Matrix n' n 𝔪.ResidueRing → ℂ)
     funext x
     let c : (Ô E)ˣ := Weil.normNegOne⁻¹
     have h_int (i : n' × n) : idem 𝔪.places * (c • x) i ∈ Ô E ↔ idem 𝔪.places * x i ∈ Ô E := by
-      simp [Units.smul_def, Subring.smul_def, mem_Ô, isUnit_Ô.1]
+      have h_mul : idem 𝔪.places * (c • x) i = (c.val : 𝔸f E) * (idem 𝔪.places * x i) := by
+        change idem 𝔪.places * ((c.val : 𝔸f E) * x i) = _
+        rw [mul_left_comm]
+      rw [h_mul]
+      refine ⟨fun h ↦ ?_, fun h ↦ mul_mem c.val.2 h⟩
+      have h' := mul_mem c⁻¹.val.2 h
+      rwa [← mul_assoc, ← Subring.coe_mul, Units.inv_mul, OneMemClass.coe_one, one_mul] at h'
     change conj (𝔪.liftFn (Ψ ∘ vecToMatrix) (c • x)) = _
     rw [liftFn_apply, liftFn_apply]
     by_cases hx : ∀ i : n' × n, idem 𝔪.places * x i ∈ Ô E
-    · simp only [dite_eq_left hx, dite_eq_left fun i ↦ (h_int i).2 (hx i), Function.comp_apply]
-      congr 2 with i j
-      simp only [vecToMatrix, of_apply, Pi.smul_apply, mul_smul_comm]
-      exact map_mul 𝔪.reduction c.val ⟨idem 𝔪.places * x (i, j), hx (i, j)⟩
+    · rw [dite_eq_left hx, dite_eq_left fun i ↦ (h_int i).2 (hx i)]
+      refine congrArg conj (congrArg Ψ (Matrix.ext fun i j ↦ ?_))
+      have h_mul : (⟨idem 𝔪.places * (c • x) (i, j), (h_int (i, j)).2 (hx (i, j))⟩ : Ô E) =
+          c.val * ⟨idem 𝔪.places * x (i, j), hx (i, j)⟩ := by
+        ext1
+        change idem 𝔪.places * ((c.val : 𝔸f E) * x (i, j)) =
+          (c.val : 𝔸f E) * (idem 𝔪.places * x (i, j))
+        rw [mul_left_comm]
+      exact (congrArg 𝔪.reduction h_mul).trans (map_mul 𝔪.reduction _ _)
     · rw [dite_eq_right hx, dite_eq_right fun h ↦ hx fun i ↦ (h_int i).1 (h i), map_zero]
   rw [modDatum, map_integrated, h_real, CoordChange.map_schrodingerOp _ (h_idem _) (h_idem _)
     𝔪.isConjDisjoint_places 𝔪.isConjDisjoint_places, h_fin, modDatum]
@@ -399,7 +501,7 @@ lemma modDatum_factor {𝔪' : Modulus E} (h : 𝔪'.ideal ≤ 𝔪.ideal) (Ψ :
   let R : Set (FinPlace E) := 𝔪'.places \ 𝔪.places
   have h_sub : 𝔪.places ⊆ 𝔪'.places := fun w hw ↦ h.trans hw
   have h_union : 𝔪.places ∪ R = 𝔪'.places := Set.union_sdiff_cancel h_sub
-  have h_conj : (𝔪.places ∪ R).IsConjDisjoint := by simpa [h_union] using 𝔪'.isConjDisjoint_places
+  have h_conj : (𝔪.places ∪ R).IsConjDisjoint := h_union ▸ 𝔪'.isConjDisjoint_places
   have h_diff : R.IsConjDisjoint :=
     𝔪'.isConjDisjoint_places.mono Set.sdiff_subset (Set.preimage_mono Set.sdiff_subset)
   have h_lift : 𝔪.liftFn (Ψ ∘ vecToMatrix) * boxIndicator (n' × n) R =
@@ -407,16 +509,23 @@ lemma modDatum_factor {𝔪' : Modulus E} (h : 𝔪'.ideal ≤ 𝔪.ideal) (Ψ :
     funext x
     have h_int : (∀ i : n' × n, idem 𝔪'.places * x i ∈ Ô E) ↔
         (∀ i : n' × n, idem 𝔪.places * x i ∈ Ô E) ∧ x ∈ integralBox (n' × n) R := by
-      simp [← h_union, idem_mul_mem_Ô, mem_integralBox, or_imp, forall_and]
+      rw [← h_union, mem_integralBox, ← forall_and]
+      refine forall_congr' fun i ↦ ?_
+      rw [idem_mul_mem_Ô, idem_mul_mem_Ô, idem_mul_mem_Ô, ← forall_and]
+      exact forall_congr' fun w ↦ ⟨fun hw ↦ ⟨fun h₁ ↦ hw (.inl h₁), fun h₂ ↦ hw (.inr h₂)⟩,
+        fun ⟨h₁, h₂⟩ hw ↦ hw.elim h₁ h₂⟩
     simp only [Pi.mul_apply, liftFn_apply, boxIndicator_apply]
     by_cases hx : ∀ i : n' × n, idem 𝔪'.places * x i ∈ Ô E
     · obtain ⟨hx_old, hx_new⟩ := h_int.1 hx
       -- The parts of `x` at the two sets of places agree modulo `𝔪`.
       have h_red (i : n' × n) : 𝔪.reduction ⟨idem 𝔪.places * x i, hx_old i⟩ =
           factor h (𝔪'.reduction ⟨idem 𝔪'.places * x i, hx i⟩) := by
-        simpa using 𝔪.reduction_congr fun w hw ↦ by simp [hw, h_sub hw]
-      simp [dite_eq_left hx, dite_eq_left hx_old, ite_eq_left hx_new, h_red, vecToMatrix,
-        Matrix.map]
+        rw [𝔪.factor_reduction _ h]
+        refine 𝔪.reduction_congr fun w hw ↦ ?_
+        change idem 𝔪.places w * x i w = idem 𝔪'.places w * x i w
+        rw [idem_of_mem hw, idem_of_mem (h_sub hw)]
+      rw [dite_eq_left hx, dite_eq_left hx_old, ite_eq_left hx_new, mul_one]
+      exact congrArg Ψ (Matrix.ext fun i j ↦ h_red (i, j))
     · -- Either `x` is not integral at `𝔪.places`, or it lies outside the box at `R`.
       obtain hx_old | hx_new := not_and_or.1 (mt h_int.2 hx)
       · rw [dite_eq_right hx, dite_eq_right hx_old, zero_mul]
@@ -458,15 +567,46 @@ lemma modKernel_reindex (e : n ≃ n₁) (he : s ∘ e.symm = s₁) (e' : n' ≃
   let f₀ : 𝒮 V₀ :=
     V₀.integrated (polyVector (realSigns E 1) 1) (V₀.schrodingerOp 𝔪.places (𝔪.liftFn 1) V₀.vacElem)
   have h_one : V₀.θ (V₀.ω 1 f₀) = 1 := by
-    simp [f₀, liftFn_one, schrodingerOp_boxIndicator 𝔪.isConjDisjoint_places, theta_apply,
-      vacElem_apply_eq_prod_lineTheta, funext_iff]
+    have hf₀ : f₀ = V₀.vacElem := by
+      dsimp only [f₀]
+      rw [polyVector_one, liftFn_one, schrodingerOp_boxIndicator 𝔪.isConjDisjoint_places,
+        V₀.projOn_vacElem]
+      exact V₀.projReal_vacElem
+    rw [map_one, one_apply_eq_self, hf₀, theta_apply,
+      vacElem_apply_eq_prod_lineTheta fun _ ↦ _root_.funext fun i ↦ i.elim]
+    exact Finset.prod_empty
   have h_signs : homSigns (s ∘ e.symm) (s' ∘ e'.symm) ∘ ε = homSigns s s' ⊕ᵥ 1 := by
-    simp [ε, funext_iff, pairSign]
+    funext x
+    rcases x with ⟨i, j⟩ | x
+    · simp only [Function.comp_apply, ε, Equiv.trans_apply, Equiv.sumEmpty_apply_inl,
+        Equiv.prodCongr_apply, Prod.map_apply, homSigns, pairSign, Sum.elim_inl,
+        Equiv.symm_apply_apply]
+    · exact x.elim
   have h_point : (S'.hom T').x.val.submatrix ε ε = fromBlocks (S.hom T).x 0 0 V₀.x := by
-    simp [S', T', ε, ← ext_iff, hom, Space.reindex]
+    refine Matrix.ext fun p q ↦ ?_
+    rcases p with ⟨i, j⟩ | p
+    · rcases q with ⟨k, l⟩ | q
+      · change kroneckerMap (· * ·) T'.x.1 S'.x⁻¹.1ᵀ (e' i, e j) (e' k, e l) =
+          kroneckerMap (· * ·) T.x.1 S.x⁻¹.1ᵀ (i, j) (k, l)
+        simp only [kroneckerMap_apply, transpose_apply]
+        change T.x.1 (e'.symm (e' i)) (e'.symm (e' k)) * S.x⁻¹.1 (e.symm (e l)) (e.symm (e j)) = _
+        rw [e'.symm_apply_apply, e'.symm_apply_apply, e.symm_apply_apply, e.symm_apply_apply]
+      · exact q.elim
+    · exact p.elim
   have h_group : (G.onHom (g', h')).adeleMatrix.submatrix ε ε =
       fromBlocks (G.onHom (g, h)).adeleMatrix 0 0 (1 : G E (1 : Empty → ℤˣ)).adeleMatrix := by
-    simp [g', h', ε, ← ext_iff, ← map_inv]
+    refine Matrix.ext fun p q ↦ ?_
+    rcases p with ⟨i, j⟩ | p
+    · rcases q with ⟨k, l⟩ | q
+      · rw [submatrix_apply, fromBlocks_apply₁₁, G.adeleMatrix_onHom, G.adeleMatrix_onHom,
+          kroneckerMap_apply, kroneckerMap_apply, transpose_apply, transpose_apply,
+          show g'⁻¹ = G.reindex e rfl g⁻¹ from (map_inv (G.reindex e rfl) g).symm,
+          G.adeleMatrix_reindex, G.adeleMatrix_reindex]
+        change h.adeleMatrix (e'.symm (e' i)) (e'.symm (e' k)) *
+            g⁻¹.adeleMatrix (e.symm (e l)) (e.symm (e j)) = _
+        rw [e'.symm_apply_apply, e'.symm_apply_apply, e.symm_apply_apply, e.symm_apply_apply]
+      · exact q.elim
+    · exact p.elim
   -- The product of the datum with the trivial one is the relabelled datum.
   have h_datum : boxProd (V := S'.hom T') h_signs
         (modDatum S T 𝔪 Ψ (polyVector (realSigns E (homSigns s s')) P)) f₀ =
@@ -476,8 +616,12 @@ lemma modKernel_reindex (e : n ≃ n₁) (he : s ∘ e.symm = s₁) (e' : n' ≃
     simp only [modDatum, f₀, boxProd_integrated_schrodingerOp_liftFn, map_one, Pi.one_apply,
       mul_one]
     rfl
+  have h_det {m m' : Type _} [Fintype m] [DecidableEq m] [Fintype m'] [DecidableEq m']
+      {t : m → ℤˣ} (f : m ≃ m') (x : G E t) : (G.reindex f rfl x).det = x.det := by
+    ext1
+    exact Matrix.det_submatrix_equiv_self f.symm x.adeleMatrix
   have h_char : pairChar a b (g', h') = pairChar a b (g, h) := by
-    simp [g', h', G.det, U.det, ← G.adeleMatrix.eq_1]
+    rw [pairChar_apply, pairChar_apply, h_det e g, h_det e' h]
   simp only [modKernel, pairTheta, pairWeil_apply, map_smul]
   rw [h_char, ← h_datum, omega_boxProd _ h_group, theta_boxProd _ h_point, h_one, mul_one]
 
@@ -499,10 +643,20 @@ lemma Rows.modKernelStdSpace_block {T : Space E n' s'} {a b : AutChar E} {𝔪 :
         (U.block ε (h, h')) =
       modKernelStdSpace T a b 𝔪 Ψ P g h * modKernelStdSpace T a b' 𝔪 Ψ' P' g h' := by
   -- The signs, the point of `stdSpace E n` and the matrix of `U.block ε (h, h')` split along `ε`.
-  have h_signs : (1 : n → ℤˣ) ∘ ε = (1 : n₁ → ℤˣ) ⊕ᵥ (1 : n₂ → ℤˣ) := by aesop
+  have h_signs : (1 : n → ℤˣ) ∘ ε = (1 : n₁ → ℤˣ) ⊕ᵥ (1 : n₂ → ℤˣ) := by
+    funext i
+    cases i <;> rfl
   refine modKernel_block_right T (stdSpace E n) a b 𝔪 h_signs ?_ ?_ b' Ψ Ψ' P P' g
-  · simp
-  · aesop (add simp (reindex_equiv ε)) (add simp [Matrix.one_apply])
+  · rw [stdSpace_x, stdSpace_x, stdSpace_x, Units.val_one, Units.val_one, Units.val_one,
+      Matrix.submatrix_one_equiv, Matrix.fromBlocks_one]
+  · refine Matrix.ext fun i j ↦ ?_
+    rcases i with i | i <;> rcases j with j | j <;> refine Prod.ext (_root_.funext fun _ ↦ ?_) ?_
+    all_goals first
+      | exact congrFun (congrFun ((Matrix.submatrix_one_equiv (α := ℂ) ε).trans
+          Matrix.fromBlocks_one.symm) _) _
+      | (change (U.block ε (h, h')).val.val (ε _) (ε _) = _
+         rw [U.block_val, submatrix_apply, ε.symm_apply_apply, ε.symm_apply_apply]
+         rfl)
 
 end New
 
