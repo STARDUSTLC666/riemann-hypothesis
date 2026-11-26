@@ -65,11 +65,6 @@ namespace New
 open Matrix MeasureTheory ComplexConjugate Complex DiscreteSeries Norms.L2Operator ComplexOrder
   GlModule Submodule WithLp HCParam
 
-private lemma grp_inv_inv {G : Type*} [Group G] (a : G) : a⁻¹⁻¹ = a := inv_inv a
-
-private lemma grp_mul_inv_rev {G : Type*} [Group G] (a b : G) : (a * b)⁻¹ = b⁻¹ * a⁻¹ :=
-  _root_.mul_inv_rev a b
-
 private lemma grp_m2 {G : Type*} [Group G] (u k : G) : (u * k)⁻¹ * u = k⁻¹ := by
   rw [_root_.mul_inv_rev, mul_assoc, inv_mul_cancel, mul_one]
 
@@ -128,8 +123,7 @@ variable {n : Type} [Fintype n] [DecidableEq n]
   (π : USign ε →* X →L[ℂ] X) (f : USign ε → ℂ)
 
 @[fun_prop]
-theorem continuous_dsKernel : Continuous l.dsKernel :=
-  continuous_const.mul (Complex.conjCLE.continuous.comp (continuous_dsCoeff l continuous_id))
+theorem continuous_dsKernel : Continuous l.dsKernel := by fun_prop [dsKernel]
 
 /-- For `l = 2λ` a parameter of some gap `h` (`New.HCParam.HasGap`),
 `conj ((-l).dsKernel x) = l.dsKernel x` for every `x` in `U(diag ε)`. That is, `conj(e_{−λ}) = e_λ`
@@ -202,29 +196,10 @@ theorem integrable_smul_rep (hu : IsUnitaryRep A π B)
     Integrable fun g : USign ε ↦ f g • π g x := by
   -- the integrable function `f g * ‖g‖ ^ A` times the bounded function `‖g‖ ^ (-A) • π g x`
   obtain ⟨c, hc⟩ := hu.growth
-  have h_ne (g : USign ε) : ‖g.val.val‖ ^ A ≠ 0 :=
-    pow_ne_zero A (norm_pos_iff.2 g.val.isUnit.ne_zero).ne'
   have bound (g : USign ε) : ‖(‖g.val.val‖ ^ A : ℂ)⁻¹ • π g x‖ ≤ c * ‖x‖ := by
-    rw [norm_smul, norm_inv, Complex.norm_pow, Complex.norm_real, norm_norm]
-    calc (‖g.val.val‖ ^ A)⁻¹ * ‖π g x‖
-        ≤ (‖g.val.val‖ ^ A)⁻¹ * (‖π g‖ * ‖x‖) :=
-          mul_le_mul_of_nonneg_left ((π g).le_opNorm x)
-            (inv_nonneg.2 (pow_nonneg (norm_nonneg _) _))
-      _ ≤ (‖g.val.val‖ ^ A)⁻¹ * (c * ‖g.val.val‖ ^ A * ‖x‖) :=
-          mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right (hc g) (norm_nonneg x))
-            (inv_nonneg.2 (pow_nonneg (norm_nonneg _) _))
-      _ = c * ‖x‖ := by rw [mul_comm c, mul_assoc, inv_mul_cancel_left₀ (h_ne g)]
-  have h_cont : Continuous fun g : USign ε ↦ ((‖g.val.val‖ : ℂ) ^ A)⁻¹ • π g x :=
-    (((Complex.continuous_ofReal.comp
-      (Units.continuous_val.comp continuous_subtypeVal).norm).pow A).inv₀
-      fun g ↦ pow_ne_zero A (Complex.ofReal_ne_zero.2
-        (norm_pos_iff.2 g.val.isUnit.ne_zero).ne')).smul (hu.continuous x)
-  have h_int := hf.smul_bdd _ h_cont.aestronglyMeasurable (.of_forall bound)
-  refine h_int.congr (.of_forall fun g ↦ ?_)
-  change (f g * (‖g.val.val‖ : ℂ) ^ A) • ((‖g.val.val‖ : ℂ) ^ A)⁻¹ • π g x = f g • π g x
-  rw [smul_smul, mul_assoc,
-    mul_inv_cancel₀ (pow_ne_zero A (Complex.ofReal_ne_zero.2
-      (norm_pos_iff.2 g.val.isUnit.ne_zero).ne')), mul_one]
+    grw [norm_smul, (π g).le_opNorm, hc]
+    simp [field]
+  simpa [Pi.smul_def', smul_smul] using hf.smul_bdd _ (by fun_prop) (.of_forall bound)
 
 variable [CompleteSpace X]
 
@@ -260,7 +235,7 @@ theorem HCParam.HasLargeGap.isIdempotentKernel_dsKernel (hg : l.HasLargeGap A) :
       dsCoeff_schur_orthogonality hg y⁻¹ x
     have h_integrand (z : USign ε) : l.dsKernel z * l.dsKernel ((z * x)⁻¹ * y) = l.formalDegree *
         (l.formalDegree * (l.dsCoeff ↑(y⁻¹ * z * x) * conj (l.dsCoeff z))) := by
-      rw [dsKernel, dsKernel, ← dsCoeff_inv hg ((z * x)⁻¹ * y), grp_mul_inv_rev, grp_inv_inv,
+      rw [dsKernel, dsKernel, ← dsCoeff_inv hg ((z * x)⁻¹ * y), _root_.mul_inv_rev, inv_inv,
         ← mul_assoc y⁻¹ z x]
       ring
     have h_value : l.dsKernel x⁻¹ / l.dsKernel 1 * l.dsKernel y =
@@ -292,7 +267,7 @@ theorem HCParam.HasLargeGap.exists_bump_conv_dsKernel (hg : l.HasLargeGap A) :
   rw [dsKernel, ← dsCoeff_inv hg g, ← h_eval, ← integral_const_mul]
   refine integral_congr_ae (.of_forall fun y ↦ ?_)
   dsimp only
-  rw [dsKernel, ← dsCoeff_inv hg (y⁻¹ * g), grp_mul_inv_rev, grp_inv_inv]
+  rw [dsKernel, ← dsCoeff_inv hg (y⁻¹ * g), _root_.mul_inv_rev, inv_inv]
   ring
 
 /-- Integration by parts. Let `λ = l / 2` have gap `500 n³ + A`, and let `π` be as in
@@ -339,12 +314,7 @@ theorem exists_integration_by_parts (hg : l.HasLargeGap A) (hu : IsUnitaryRep A 
     have h_deriv (g : USign ε) (t : ℝ) :
         HasDerivAt (fun s : ℝ ↦ F (g * expU (s • Y))) (F' (g * expU (t • Y))) t :=
       (hasDerivAt_rightDeriv_expU f.val g Y t).smul (hd.isCoeffMap 1 g Y v t)
-    have h_cont (g : USign ε) : Continuous fun t : ℝ ↦ F' (g * expU (t • Y)) := by
-      have h_exp : Continuous fun t : ℝ ↦ g * expU (t • Y) :=
-        continuous_const.mul (continuous_expU.comp (continuous_id.smul continuous_const))
-      exact (((SmoothU.continuous f.val).comp h_exp).smul ((hu.continuous _).comp h_exp)).add
-        (((SmoothU.continuous ((-l).dsAction Y f).val).comp h_exp).smul
-          ((hu.continuous _).comp h_exp))
+    have h_cont (g : USign ε) : Continuous fun t : ℝ ↦ F' (g * expU (t • Y)) := by fun_prop
     have h_ftc (g : USign ε) :
         ∫ t in Set.Ioc (0 : ℝ) 1, F' (g * expU (t • Y)) = F (g * expU Y) - F g := by
       have h1 := intervalIntegral.integral_eq_sub_of_hasDerivAt
@@ -377,15 +347,10 @@ theorem exists_integration_by_parts (hg : l.HasLargeGap A) (hu : IsUnitaryRep A 
       rw [h_apply, h_apply]
       exact h_real Z f v
     have h_P : P f (ι (ρ Y v)) = -P ((-l).dsAction Y f) (ι v) := by
-      let Y₁ := unitaryLiePart ε Y
-      let Y₂ := unitaryLiePart ε (-I • Y)
-      have hY : Y = (Y₁ : Matrix n n ℂ) + I • (Y₂ : Matrix n n ℂ) :=
-        eq_unitaryLiePart_add_I_smul ε Y
-      rw [hY, ρ.ρ.map_add, ρ.ρ.map_smul, LinearMap.add_apply, LinearMap.smul_apply,
-        ι.map_add, ι.map_smul, (P f).map_add, (P f).map_smul, h_P_real Y₁, h_P_real Y₂,
-        ((-l).dsAction.ρ).map_add, ((-l).dsAction.ρ).map_smul, LinearMap.add_apply,
-        LinearMap.smul_apply, P.map_add, P.map_smul, _root_.add_apply, _root_.smul_apply,
-        smul_neg, ← neg_add]
+      rw [eq_unitaryLiePart_add_I_smul ε Y]
+      -- expand both sides by linearity and use `h_real` on `Y₁` and `Y₂`
+      simp [↓map_add, P, integratedRep, h_int, h_real, strongIntegral_apply]
+      abel
     change l.formalDegree • P f (ι (ρ Y v)) = -(l.formalDegree • P ((-l).dsAction Y f) (ι v))
     rw [h_P, smul_neg]
 
@@ -435,21 +400,8 @@ theorem HCParam.IsKHighest.isKDominant_of_isUnitaryRep (hu : IsUnitaryRep A π B
     simpa only [← h_inner] using inner_self_nonneg
   rw [hd.form_E_eq_sign_mul hu] at norm_nonneg
   have h_comm : ρ.E a b (ρ.E b a v) = ((ν a : ℂ) - ν b) • v := by
-    rw [GlModule.E, GlModule.E, ρ.apply_apply_eq_swap_add_bracket, ← GlModule.E, ← GlModule.E,
-      hv.2 a b h_sign (neg_lt_neg_iff.1 h_lt), map_zero, zero_add]
-    have h_br : single a b (1 : ℂ) * single b a 1 - single b a 1 * single a b 1 =
-        single a a 1 - single b b 1 := by
-      rw [single_mul_single_same, single_mul_single_same, mul_one]
-    rw [h_br, map_sub, LinearMap.sub_apply, ← GlModule.E, ← GlModule.E, hv.1 a, hv.1 b, sub_smul]
-  have h_sign_sq : (ε b * ε b).val = (1 : ℤ) := by
-    rcases Int.units_eq_one_or (ε b) with h | h <;> rw [h] <;> rfl
-  rw [h_sign, h_sign_sq, Int.cast_one, one_mul, h_comm, map_smul, map_smul,
-    smul_eq_mul, RCLike.re_eq_complex_re, Complex.mul_re, Complex.sub_re, Complex.intCast_re,
-    Complex.intCast_re, Complex.sub_im, Complex.intCast_im, Complex.intCast_im, sub_self,
-    zero_mul, sub_zero] at norm_nonneg
-  have h_sub : (0 : ℝ) ≤ (ν a : ℝ) - (ν b : ℝ) :=
-    nonneg_of_mul_nonneg_left norm_nonneg (hu.pos (ι v) hv_ne)
-  exact Int.cast_le.1 (sub_nonneg.1 h_sub)
+    simp_all [ρ.apply_apply_eq_swap_add_bracket, IsKHighest, sub_smul]
+  simp_all [hu.pos (ι v) hv_ne]
 
 /-- Let `λ = l / 2` have gap `500 n³ + A`, let `π` be as in `New.IsUnitaryRep` with derivative `ρ`
 along `ι`, and let `v` be `K`-highest of weight `ν`. Suppose `ν - New.HCParam.lowestKType l` lies
@@ -504,7 +456,7 @@ theorem integratedRep_eq_zero_of_notMem_rootCone (hg : l.HasLargeGap A)
             B w (π ((y * k)⁻¹ * g)⁻¹ (ι v)) ∂haarK ε) =
         ∫ g : USign ε, (∫ k : maxCompactU ε, conj (weightMinors ν k) *
             l.dsCoeff ↑(y * k * g) ∂haarK ε) * B w (π g⁻¹ (ι v)) := by
-      simpa only [grp_inv_inv, mul_assoc, smul_eq_mul, h_gen] using on_vec.symm.trans on_psi
+      simpa only [inv_inv, mul_assoc, smul_eq_mul, h_gen] using on_vec.symm.trans on_psi
     have h_average (g : USign ε) :
         ∫ k : maxCompactU ε, conj (weightMinors ν k) *
           B w (π ((y * k)⁻¹ * g)⁻¹ (ι v)) ∂haarK ε = T * B (π y⁻¹ (π g w)) (ι v) := by
@@ -512,7 +464,7 @@ theorem integratedRep_eq_zero_of_notMem_rootCone (hg : l.HasLargeGap A)
       refine integral_congr_ae (.of_forall fun k ↦ ?_)
       dsimp only
       congr 1
-      rw [hu.form_apply_eq_form_inv_apply, grp_inv_inv, grp_mul_inv_rev,
+      rw [hu.form_apply_eq_form_inv_apply, inv_inv, _root_.mul_inv_rev,
         rep_apply_apply, rep_apply_apply]
     simp only [h_average, h_psi, zero_mul, integral_zero, mul_left_comm (l.dsCoeff _),
       integral_const_mul] at h_exchange
@@ -522,7 +474,7 @@ theorem integratedRep_eq_zero_of_notMem_rootCone (hg : l.HasLargeGap A)
   have h_integrand (g : USign ε) : l.dsKernel g⁻¹ • B w (π g⁻¹ (π y (ι v))) =
       l.formalDegree * (l.dsCoeff g * B (π y⁻¹ (π g w)) (ι v)) := by
     rw [dsKernel, dsCoeff_inv hg, Complex.conj_conj, smul_eq_mul,
-      hu.form_apply_eq_form_inv_apply, hu.form_apply_eq_form_inv_apply, grp_inv_inv, mul_assoc]
+      hu.form_apply_eq_form_inv_apply, hu.form_apply_eq_form_inv_apply, inv_inv, mul_assoc]
   have h_self : B w w = 0 := by
     rw [map_integratedRep hu (hg.integrable_dsKernel_mul_norm_pow A A.le_succ),
       ← integral_inv_eq_self]
@@ -558,7 +510,7 @@ theorem re_integratedRep_dsKernel_pos (hg : l.HasLargeGap A) (hu : IsUnitaryRep 
       ← integral_conj] at h1
     refine (integral_congr_ae (.of_forall fun k ↦ ?_)).trans h1
     rw [map_mul, conj_weightMinors, conjTranspose_conjTranspose, one_mul, hu.conj_symm,
-      hu.form_apply_eq_form_inv_apply, grp_inv_inv]
+      hu.form_apply_eq_form_inv_apply, inv_inv]
   let μ : Measure (maxCompactU ε × maxCompactU ε) := (haarK ε).prod (haarK ε)
   let Φ (g : USign ε) : ℂ := B x (l.dsKernel g • π g x)
   have kernel_int : Integrable fun g : USign ε ↦ l.dsKernel g * (‖(g : Matrix n n ℂ)‖ : ℂ) ^ A :=
@@ -603,7 +555,7 @@ theorem re_integratedRep_dsKernel_pos (hg : l.HasLargeGap A) (hu : IsUnitaryRep 
           weightMinors Λ (k.2.val.val.valᴴ * u) /
             weightMinors (-paramAddRho l) (u.val.val.valᴴ * z * u) ∂haarK ε) / Λ.kTypeNormSq := by
       have h1 := congrArg conj (dsCoeff_polar hg (k.1⁻¹ * κ) k.2⁻¹ hz)
-      rw [grp_inv_inv, map_div₀, Complex.conj_ofReal, ← integral_conj] at h1
+      rw [inv_inv, map_div₀, Complex.conj_ofReal, ← integral_conj] at h1
       refine (congrArg (fun g : USign ε ↦ conj (l.dsCoeff g)) ?_).trans (h1.trans ?_)
       · rw [Subgroup.coe_mul, mul_assoc, mul_assoc, mul_assoc]
       · refine congrArg (· / (Λ.kTypeNormSq : ℂ)) (integral_congr_ae (.of_forall fun u ↦ ?_))
@@ -672,7 +624,7 @@ theorem re_integratedRep_dsKernel_pos (hg : l.HasLargeGap A) (hu : IsUnitaryRep 
         rw [hK_adj_eq, hK_adj_eq, ← hK_mul, grp_m2]
       have h_grp : ((κ * u * k₁)⁻¹ : maxCompactU ε).val * κ.val * z * (u * k₂ : maxCompactU ε).val =
           k₁.val⁻¹ * ((u⁻¹ : maxCompactU ε).val * z * u.val * k₂.val) := by
-        simp only [Subgroup.coe_inv, Subgroup.coe_mul, grp_mul_inv_rev, mul_assoc,
+        simp only [Subgroup.coe_inv, Subgroup.coe_mul, _root_.mul_inv_rev, mul_assoc,
           inv_mul_cancel_left]
       dsimp only [Ψ, c, Prod.mk_mul_mk]
       rw [h_m1, h_m2, h_grp, rep_apply_apply]
@@ -948,13 +900,13 @@ theorem integratedRep_fix_of_isKHighest (hg : l.HasLargeGap A) (hu : IsUnitaryRe
       rw [← integral_const_mul]
       refine integral_congr_ae (.of_forall fun y ↦ ?_)
       dsimp only
-      rw [dsKernel, ← dsCoeff_inv hg (y⁻¹ * g⁻¹), grp_mul_inv_rev, grp_inv_inv, grp_inv_inv]
+      rw [dsKernel, ← dsCoeff_inv hg (y⁻¹ * g⁻¹), _root_.mul_inv_rev, inv_inv, inv_inv]
       ring
     rw [h2] at h1
     exact mul_left_cancel₀ (Complex.ofReal_ne_zero.2 (formalDegree_pos hg).ne') h1
   let d : X := integratedRep π f (ι v) - ι v
   have h_orth (g : USign ε) : B d (π g (ι v)) = 0 := by
-    rw [← hu.conj_symm, map_sub, map_integratedRep hu hf, ← grp_inv_inv g]
+    rw [← hu.conj_symm, map_sub, map_integratedRep hu hf, ← inv_inv g]
     simp only [← hu.form_apply_eq_form_inv_apply, rep_apply_apply,
       coeff_eq_dsCoeff_of_isKHighest hg hu hd hv hv_casimir hc_ge, smul_eq_mul, mul_left_comm (f _),
       integral_const_mul, h_psi, sub_self, map_zero]
