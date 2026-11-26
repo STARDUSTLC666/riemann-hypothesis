@@ -77,8 +77,11 @@ lemma mul_inv_mem_besselH_of_orbitPoint_eq {A : Type} {𝔰 : Shape} [SemilocalF
     {T : 𝔰.Form A} {l l' : T.G} (hl : l ∈ T.floorGroup 𝔰.ϱ)
     (hl' : l' ∈ T.floorGroup 𝔰.ϱ) (h_point : orbitPoint 𝔰.top l' = orbitPoint 𝔰.top l) :
     l' * l⁻¹ ∈ T.besselH := by
-  simpa only [inv_inv] using partialUnitriangularGroup_inf_floorGroup_last.le
-    (inv_mul_mem_of_orbitPoint_eq (inv_mem hl') (inv_mem hl) (by simpa using h_point))
+  have h_inv : orbitPoint 𝔰.top l'⁻¹⁻¹ = orbitPoint 𝔰.top l⁻¹⁻¹ := by
+    rw [inv_inv, inv_inv, h_point]
+  have h := partialUnitriangularGroup_inf_floorGroup_last.le
+    (inv_mul_mem_of_orbitPoint_eq (inv_mem hl') (inv_mem hl) h_inv)
+  rwa [inv_inv] at h
 
 /-- For `l` in the floor group G^(ϱ) = `T.floorGroup 𝔰.ϱ`, the fixer of the hyperbolic pairs,
 `fiberPairing Z p q` at `orbitPoint 𝔰.top l = l⁻¹ z` is the integral over `k` of the pairing of
@@ -118,7 +121,11 @@ lemma mulVec_mem_lastVectorQuadric {A : Type} {𝔰 : Shape} [SemilocalField A] 
   have h_row (a : 𝔰.BesselIndex) :
       (l : GL 𝔰.BesselIndex A) i a = (1 : Matrix 𝔰.BesselIndex 𝔰.BesselIndex A) i a :=
     apply_eq_one_apply_of_mem_floorGroup hl i a (.inl ⟨hi, hi⟩)
-  simp [mulVec, dotProduct, h_row, Matrix.one_apply, h_floor i hi]
+  rw [mulVec, dotProduct, Finset.sum_eq_single i]
+  · rw [h_row i, Matrix.one_apply_eq, one_mul, h_floor i hi]
+  · intro a _ ha
+    rw [h_row a, Matrix.one_apply_ne ha.symm, zero_mul]
+  · intro h; exact absurd (Finset.mem_univ _) h
 
 /-- The pairings of the scaled orbital integrals of `Z` at `l`, for the heads `ω a`, summed against
 a matrix `R`. If `R` is the Gram matrix of vectors `x a`, this is the squared norm of the sum over
@@ -139,10 +146,17 @@ lemma PlaceData.headSumNormSq_eq_sum {F : PlaceData ι T (m + 1)} (Z : F.Interme
   let c (a : j) : EuclideanSpace ℂ (Z.Cosets × Z.Cosets) := scaledOrbitalIntegral Z (ω a) l
   calc headSumNormSq Z R ω l
     _ = ∑ a : j, ∑ b : j, ∑ x : Z.Cosets × Z.Cosets, star (c a x) * (R a b * c b x) := by
-      simp [c, headSumNormSq, inner, mul_sum, mul_comm, mul_assoc]
+      rw [headSumNormSq]
+      refine Finset.sum_congr rfl fun a _ ↦ Finset.sum_congr rfl fun b _ ↦ ?_
+      rw [PiLp.inner_apply, Finset.mul_sum]
+      exact Finset.sum_congr rfl fun x _ ↦ by
+        rw [RCLike.inner_apply, ← Complex.star_def, mul_comm (c b x), mul_left_comm (R a b)]
     _ = ∑ x : Z.Cosets × Z.Cosets, ∑ a : j, ∑ b : j, star (c a x) * (R a b * c b x) := by
       simp only [sum_comm (γ := Z.Cosets × Z.Cosets)]
-    _ = _ := by simp [c, mulVec, dotProduct, mul_sum]
+    _ = _ := Finset.sum_congr rfl fun x _ ↦ by
+      rw [dotProduct]
+      refine Finset.sum_congr rfl fun a _ ↦ ?_
+      rw [Pi.star_apply, mulVec, dotProduct, Finset.mul_sum]
 
 /-- The pairings of the scaled orbital integrals of `Z` at `l` for the heads `ω a`, summed against a
 positive semidefinite matrix `R`, give a nonnegative real. -/
@@ -199,7 +213,7 @@ lemma sum_fiberPairing_nonneg {F : PlaceData ι T (m + 1)} (Z : F.IntermediateGr
       sum_sum_mul_integral_nonneg (R := R)
         (fun a b ↦ integrable_inner_scaledOrbitalIntegral Z (ω a) (ω b) hl)
         fun g ↦ headSumNormSq_nonneg Z hR ω (g * l)
-  · simp [fiberPairing, h_orbit]
+  · simp only [fiberPairing, dite_eq_right h_orbit, mul_zero, sum_const_zero, le_refl]
 
 /-- The scaled orbital integral of the finite Bessel vector of `Z` with head `r` does not change
 when the inverse link `l` is multiplied on the left by an element of
@@ -211,7 +225,8 @@ lemma _root_.New.Floors.PlaceData.scaledOrbitalIntegral_mul_left {F : PlaceData 
     scaledOrbitalIntegral Z r (k * l) = scaledOrbitalIntegral Z r l := by
   have hW (y : T.G) : Z.besselVector ((weylElem 𝔰.ϱ r * (k * l)⁻¹)⁻¹ * y) =
       Z.besselVector ((weylElem 𝔰.ϱ r * l⁻¹)⁻¹ * y) := by
-    simp [mul_assoc, besselVector_mul_left Z hk]
+    rw [_root_.mul_inv_rev, inv_inv, _root_.mul_inv_rev, inv_inv, mul_assoc k, mul_assoc k,
+      besselVector_mul_left Z hk]
   rw [scaledOrbitalIntegral, scaledOrbitalIntegral,
     besselOrbitalIntegral_congr F.groupMeasure fun y _ ↦ hW y]
 
@@ -225,11 +240,14 @@ lemma _root_.New.Floors.sum_indicator_mul_le_of_inv_mul_mem {G i : Type*} [Group
   by_cases h_mem : ∃ θ : i, g * β θ ∈ K
   · obtain ⟨θ, hθ⟩ := h_mem
     have h_other (θ' : i) (hθ' : θ' ≠ θ) : g * β θ' ∉ K := fun h_mem' ↦
-      hθ' (h_sep θ' θ (by simpa [mul_assoc] using mul_mem (inv_mem h_mem') hθ))
+      hθ' (h_sep θ' θ (by
+        have h := mul_mem (inv_mem h_mem') hθ
+        rwa [_root_.mul_inv_rev, mul_assoc, inv_mul_cancel_left] at h))
     rw [Fintype.sum_eq_single θ fun θ' hθ' ↦ indicator_of_notMem (h_other θ' hθ') _,
       indicator_of_mem hθ]
     exact h_le θ hθ
-  · simp [indicator_of_notMem (not_exists.1 h_mem _)]
+  · rw [Finset.sum_eq_zero fun θ _ ↦ indicator_of_notMem (not_exists.1 h_mem θ) _]
+    exact zero_le
 
 /-- Let `F` be a large lattice datum and `R` a positive semidefinite matrix. Let the elements `l θ`
 of the floor group G^(ϱ) lie over one vector `e = (l θ)⁻¹ z` and in distinct right cosets of the
@@ -258,10 +276,14 @@ lemma sum_headSumNormSq_le_fiberPairing {F : PlaceData ι T (m + 1)} (Z : F.Inte
     exact mul_inv_mem_besselH_of_orbitPoint_eq h_floor hl₀ h_point.symm
   have h_coset (θ : i) (g : T.G) (hg : g ∈ besselH) (hgβ : g * β θ ∈ F.congruenceSubgroup)
       (r : ℕ → Aˣ) : scaledOrbitalIntegral Z r (l θ) = scaledOrbitalIntegral Z r (g * l₀) := by
-    have h_arg : g * l₀ = g * β θ * l θ := by simp [β, mul_assoc]
+    have h_arg : g * l₀ = g * β θ * l θ := by
+      dsimp only [β]
+      rw [mul_assoc, inv_mul_cancel_right]
     rw [h_arg, scaledOrbitalIntegral_mul_left Z r ⟨mul_mem hg (hβ θ), hgβ⟩]
   have β_sep (θ θ' : i) (h_quot : (β θ)⁻¹ * β θ' ∈ F.congruenceSubgroup) : θ = θ' :=
-    h_sep θ θ' (by simpa [β, mul_assoc] using h_quot)
+    h_sep θ θ' (by
+      dsimp only [β] at h_quot
+      rwa [_root_.mul_inv_rev, inv_inv, mul_assoc, inv_mul_cancel_left] at h_quot)
   have h_mem : ∀ᵐ g : T.G ∂F.measureH, g ∈ besselH := F.ae_measureH_mem_besselH
   let I (g : T.G) : ℝ≥0∞ := ENNReal.ofReal (headSumNormSq Z R ω g).re
   calc F.measureH F.congruenceSubgroup * ∑ θ : i, I (l θ)
@@ -271,7 +293,8 @@ lemma sum_headSumNormSq_le_fiberPairing {F : PlaceData ι T (m + 1)} (Z : F.Inte
         lintegral_indicator_const measurableSet_unitaryLevel, mul_sum, mul_comm]
     _ = ∫⁻ g, ∑ θ : i, (F.congruenceSubgroup : Set T.G).indicator (fun _ ↦ I (l θ)) (g * β θ)
           ∂F.measureH :=
-      (lintegral_finsetSum _ (by fun_prop (disch := exact measurableSet_unitaryLevel))).symm
+      (lintegral_finsetSum _ fun θ _ ↦
+        (measurable_const.indicator measurableSet_unitaryLevel).comp (measurable_mul_const _)).symm
     _ ≤ ∫⁻ g, I (g * l₀) ∂F.measureH := by
       refine lintegral_le_of_ae_imp h_mem fun g hg ↦
         sum_indicator_mul_le_of_inv_mul_mem β_sep fun θ hθ ↦ le_of_eq ?_
@@ -305,8 +328,13 @@ lemma fiberPairing_mulVec {F : PlaceData ι T (m + 1)} (Z : F.IntermediateGroup)
           (Z.besselVector ((w * (g * (l * k⁻¹))⁻¹)⁻¹ * y) i.2) ∂F.groupMeasure =
       ∫ y : T.G, Z.besselVector y i.1 * starRingEnd ℂ
           (Z.besselVector ((w * (g * l)⁻¹)⁻¹ * y) i.2) ∂F.groupMeasure
+    have h_arg (y : T.G) : (w * (g * (l * k⁻¹))⁻¹)⁻¹ * (k * y) = (w * (g * l)⁻¹)⁻¹ * y := by
+      simp only [w, _root_.mul_inv_rev, inv_inv, mul_assoc, (weylElem_mul_left_comm hk').2,
+        inv_mul_cancel_left]
     rw [← integral_mul_left_eq_self _ k]
-    simp [w, mul_assoc, (weylElem_mul_left_comm hk').2, besselVector_mul_left Z hk]
+    refine integral_congr_ae (.of_forall fun y ↦ ?_)
+    dsimp only
+    rw [besselVector_mul_left Z hk, h_arg]
   rw [h_point, fiberPairing_orbitPoint Z p q hl,
     fiberPairing_orbitPoint Z p q (mul_mem hl (inv_mem hk'))]
   simp only [h_corr]
@@ -332,7 +360,8 @@ lemma exists_isCompact_fiberPairing_support {F : PlaceData ι T (m + 1)} (Z : F.
     by_contra! h_zero
     refine he ((fiberPairing_orbitPoint Z p q hl).trans (integral_eq_zero_of_ae ?_))
     filter_upwards [F.ae_measureH_mem_besselH] with k hk
-    simp [h_zero k hk]
+    rw [h_zero k hk, inner_zero_left]
+    rfl
   obtain ⟨hk_tri, hk_floor⟩ : k ∈ partialUnitriangularGroup 𝔰.n ∧ k ∈ T.floorGroup 𝔰.ϱ :=
     partialUnitriangularGroup_inf_floorGroup_last.ge hk
   have hkl : k * l ∈ T.floorGroup 𝔰.ϱ := mul_mem hk_floor hl
@@ -365,21 +394,24 @@ lemma exists_section_orbitPoint {F : PlaceData ι T (m + 1)} [h : P.IsLargeLatti
   let z : 𝔰.BesselIndex → A := Pi.single (𝔰.besselFrame 𝔰.top) 1
   have h_move : Tendsto (fun x : 𝔰.BesselIndex → A ↦ (l : GL 𝔰.BesselIndex A).val *ᵥ x)
       (nhds (orbitPoint 𝔰.top l)) (nhds z) :=
-    Continuous.tendsto' (by fun_prop) _ _ (orbitPoint_eq_iff.1 rfl)
+    Continuous.tendsto' (continuous_const.matrix_mulVec continuous_id) _ _ (orbitPoint_eq_iff.1 rfl)
+  have hz_one : z (𝔰.besselFrame 𝔰.top) = (1 : Aˣ) := Pi.single_eq_same _ _
   have h_inv : ContinuousAt Ring.inverse (z (𝔰.besselFrame 𝔰.top)) := by
-    have hz_one : z (𝔰.besselFrame 𝔰.top) = (1 : Aˣ) := Pi.single_eq_same _ _
     have h_units : Continuous fun a : Aˣ ↦ Ring.inverse (a : A) :=
-      Units.continuous_coe_inv.congr (by simp)
+      Units.continuous_coe_inv.congr fun _ ↦ (Ring.inverse_unit _).symm
     rw [hz_one]
     exact h_open.continuousAt_iff.1 h_units.continuousAt
   have h_eichler : Tendsto (topEichler hu_dual hu_last) (nhds z) (nhds 1) := by
     rw [← topEichler_single hu_dual hu_last]
     exact continuousAt_topEichler hu_dual hu_last h_inv
   have h_unit : ∀ᶠ e in nhds z, IsUnit (e (𝔰.besselFrame 𝔰.top)) :=
-    (h_open.isOpen_range.preimage (by fun_prop)).mem_nhds ⟨1, by simp [z]⟩
+    ((continuous_apply (𝔰.besselFrame 𝔰.top) :
+        Continuous fun e : 𝔰.BesselIndex → A ↦ e (𝔰.besselFrame 𝔰.top)).isOpen_preimage _
+      h_open.isOpen_range).mem_nhds ⟨1, hz_one.symm⟩
   refine ⟨fun x : 𝔰.BesselIndex → A ↦
     l⁻¹ * topEichler hu_dual hu_last ((l : GL 𝔰.BesselIndex A).val *ᵥ x) * l, ?_, ?_⟩
-  · simpa using ((h_eichler.comp h_move).const_mul l⁻¹).mul_const l
+  · have ht := ((h_eichler.comp h_move).const_mul l⁻¹).mul_const l
+    rwa [mul_one, inv_mul_cancel] at ht
   · filter_upwards [h_move.eventually h_unit] with x hx_unit hx
     let e : 𝔰.BesselIndex → A := (l : GL 𝔰.BesselIndex A).val *ᵥ x
     obtain ⟨h_floor, h_norm⟩ : (∀ i : 𝔰.BesselIndex, floorOf i < 𝔰.ϱ → e i = 0) ∧
@@ -388,8 +420,11 @@ lemma exists_section_orbitPoint {F : PlaceData ι T (m + 1)} [h : P.IsLargeLatti
     -- The Eichler map of `e = l x` sends `e` to `z`.
     have h_sends : (topEichler hu_dual hu_last e : GL 𝔰.BesselIndex A).val *ᵥ e = z :=
       orbitPoint_eq_iff.1 (orbitPoint_topEichler hu_dual hu_last h_norm hx_unit)
-    rw [orbitPoint_eq_iff]
-    simpa [e, z, mul_assoc, ← mulVec_mulVec] using h_sends
+    rw [orbitPoint_eq_iff, ← mul_assoc l, ← mul_assoc l, mul_inv_cancel, one_mul]
+    change ((topEichler hu_dual hu_last e : GL 𝔰.BesselIndex A).val *
+      (l : GL 𝔰.BesselIndex A).val) *ᵥ x = z
+    rw [← mulVec_mulVec]
+    exact h_sends
 
 /-- At a large lattice datum `F`, the fiber pairing `fiberPairing Z p q` is locally constant along
 the last vector quadric `lastVectorQuadric T` at the points `orbitPoint 𝔰.top l = l⁻¹ z`, for `l` in
@@ -488,7 +523,12 @@ lemma floorForm_top_eq_integral_floorQuadric {F : PlaceData ι T (m + 1)} (Z : F
         rw [_root_.mul_inv_rev, (frameGram_diag_mul hk_inv l⁻¹).2, one_mul]
       _ = star (orbitPoint 𝔰.top (1 : T.G)) ⬝ᵥ T.splitGram *ᵥ orbitPoint 𝔰.top l := by
         rw [frameGram_eq_form_orbitPoint]
-      _ = (T.splitGram *ᵥ orbitPoint 𝔰.top l) 𝔰.z := by simp [h_one]
+      _ = (T.splitGram *ᵥ orbitPoint 𝔰.top l) 𝔰.z := by
+        rw [h_one, dotProduct, Finset.sum_eq_single (𝔰.besselFrame 𝔰.top)]
+        · rw [Pi.star_apply, Pi.single_eq_same, star_one, one_mul, besselFrame_top]
+        · intro x _ hx
+          rw [Pi.star_apply, Pi.single_eq_of_ne hx, star_zero, zero_mul]
+        · intro h; exact absurd (Finset.mem_univ _) h
   have h_pres : MeasurePreserving (orbitPoint 𝔰.top) (F.floorMeasure 𝔰.ϱ)
       (F.floorQuadricMeasure 𝔰.top) :=
     measurePreserving_orbitPoint 𝔰.top
@@ -507,7 +547,12 @@ lemma floorForm_top_eq_integral_floorQuadric {F : PlaceData ι T (m + 1)} (Z : F
       refine integral_congr_ae (F.ae_measureH_mem_besselH.mono fun k hk ↦ ?_)
       simp only [f, h_entry l k hk]
     _ = _ := by
-      rw [← h_pres.map_eq, integral_map h_pres.aemeasurable (by fun_prop)]
+      have h_meas : AEStronglyMeasurable
+          (fun e : 𝔰.BesselIndex → A ↦ P.ψ (ξ * (T.splitGram *ᵥ e) 𝔰.z) * Φ e)
+          ((F.floorMeasure 𝔰.ϱ).map (orbitPoint 𝔰.top)) :=
+        ((P.continuous_psi.comp (continuous_const.mul ((continuous_apply 𝔰.z).comp
+          (continuous_const.matrix_mulVec continuous_id)))).mul hΦ).aestronglyMeasurable
+      rw [← h_pres.map_eq, integral_map h_pres.aemeasurable h_meas]
 
 end IntegralPlace.IsLargeLatticeData
 
@@ -555,7 +600,9 @@ lemma integral_lastEntryDensity {F : PlaceData ι (latticeMiddleGram 𝔰 N) (m 
   obtain ⟨Φ, Φ_supp, Φ_unif, -, Φ_eq⟩ := exists_step_function_eqOn_fiberPairing Z p q
   have Φ_cont : Continuous Φ := (isLocallyConstant_of_eventually_add Φ_unif).continuous
   let g (e : 𝔰.BesselIndex → A) : ℂ := P.ψ (ξ * ((latticeMiddleGram 𝔰 N).splitGram *ᵥ e) 𝔰.z) * Φ e
-  have g_cont : Continuous g := .mul (by fun_prop) Φ_cont
+  have g_cont : Continuous g :=
+    (P.continuous_psi.comp (continuous_const.mul ((continuous_apply 𝔰.z).comp
+      (continuous_const.matrix_mulVec continuous_id)))).mul Φ_cont
   let slice (t : A) : ℂ :=
     (P.modulus π)⁻¹.toReal * ∫ x, g (vectorOfLastEntry π t x) ∂P.normFiberMeasure 𝔰.κ
       (lastEntrySphereIndex π t)
@@ -566,9 +613,16 @@ lemma integral_lastEntryDensity {F : PlaceData ι (latticeMiddleGram 𝔰 N) (m 
   have f_eq : slice =ᵐ[volume] f := by
     filter_upwards [P.ae_isUnit] with _ ⟨t, ht⟩
     subst ht
+    have h_scaled (r : ℕ → Aˣ) (l : (latticeMiddleGram 𝔰 N).G) :
+        scaledOrbitalIntegral Z (update r 𝔰.ϱ t) l = scaledOrbitalIntegral Z r l := by
+      rw [scaledOrbitalIntegral, scaledOrbitalIntegral, weylElem_update]
+      congr 2
+      rw [headDensity, headDensity]
+      exact Finset.prod_congr rfl fun a ha ↦ by
+        rw [update_of_ne (Finset.mem_range.1 ha).ne]
     have h_heads (e : 𝔰.BesselIndex → A) :
         fiberPairing Z (update p 𝔰.ϱ t) (update q 𝔰.ϱ t) e = fiberPairing Z p q e := by
-      simp [fiberPairing, scaledOrbitalIntegral, headDensity, prod_range, LT.lt.ne]
+      simp only [fiberPairing, h_scaled]
     have h_sphere : ∫ x, Φ (vectorOfLastEntry π t x) ∂P.normFiberMeasure 𝔰.κ
       (lastEntrySphereIndex π t) =
         ∫ x, fiberPairing Z p q (vectorOfLastEntry π t x) ∂P.normFiberMeasure 𝔰.κ
@@ -580,7 +634,7 @@ lemma integral_lastEntryDensity {F : PlaceData ι (latticeMiddleGram 𝔰 N) (m 
       (form_vectorOfLastEntry hN).2
     simp only [slice, f, g, lastEntryDensity, update_self, unitOrOne_val, h_last,
       integral_const_mul, h_heads, h_sphere]
-    ring
+    exact mul_left_comm _ _ _
   refine ⟨slice_int.congr f_eq, ?_⟩
   rw [← integral_congr_ae f_eq, slice_eq,
     floorForm_top_eq_integral_floorQuadric Z p q ξ Φ_cont Φ_eq]
@@ -604,8 +658,9 @@ lemma continuous_lastEntryDensity {F : PlaceData ι (latticeMiddleGram 𝔰 N) (
     (isDisintegration_normFiberMeasure F.two_le_card).continuous_integral
       (Φ_cont.comp h_emb.continuous)
       (Φ_supp.comp_isClosedEmbedding h_emb)
-  have h_level : Continuous fun z : (ℕ → Aˣ) × (ℕ → Aˣ) ↦ lastEntrySphereIndex π (z.1 𝔰.ϱ : A) := by
-    fun_prop
+  have h_level : Continuous fun z : (ℕ → Aˣ) × (ℕ → Aˣ) ↦ lastEntrySphereIndex π (z.1 𝔰.ϱ : A) :=
+    continuous_lastEntrySphereIndex.comp
+      (Units.continuous_val.comp ((continuous_apply 𝔰.ϱ).comp continuous_fst))
   refine ((h_weak.comp h_level).const_mul ((P.modulus π)⁻¹.toReal : ℂ)).continuousAt.congr ?_
   have h_corr (r : ℕ → Aˣ) : ∀ᶠ r' in nhds r, ∀ l ∈ (latticeMiddleGram 𝔰 N).floorGroup 𝔰.ϱ,
       scaledOrbitalIntegral Z r' l = scaledOrbitalIntegral Z r l := by
@@ -613,9 +668,17 @@ lemma continuous_lastEntryDensity {F : PlaceData ι (latticeMiddleGram 𝔰 N) (
       (eventually_scaledOrbitalIntegral_mul_eq_self Z r)]
       with r' h_eq l hl
     simpa only [mul_one] using h_eq (one_mem _) l hl
+  have h_shift_cont : Continuous fun z : (ℕ → Aˣ) × (ℕ → Aˣ) ↦
+      vectorOfLastEntry π ((z.1 𝔰.ϱ : A) - p 𝔰.ϱ) (0 : 𝔰.κ → A) :=
+    continuous_vectorOfLastEntry.comp
+      (((Units.continuous_val.comp ((continuous_apply 𝔰.ϱ).comp continuous_fst)).sub
+        continuous_const).prodMk continuous_const)
   have h_shift : Tendsto (fun z : (ℕ → Aˣ) × (ℕ → Aˣ) ↦
       vectorOfLastEntry π ((z.1 𝔰.ϱ : A) - p 𝔰.ϱ) (0 : 𝔰.κ → A)) (nhds (p, q)) (nhds 0) :=
-    Continuous.tendsto' (by fun_prop) (p, q) 0 (by simp [vectorOfLastEntry, ← Pi.zero_def])
+    h_shift_cont.tendsto' (p, q) 0 (by
+      rw [sub_self, vectorOfLastEntry, mul_zero]
+      refine (congrArg _ (funext fun x ↦ ?_)).trans (mulVec_zero _)
+      rcases x with _ | (_ | _) | _ <;> rfl)
   filter_upwards [prod_mem_nhds (h_corr p) (h_corr q), h_shift.eventually Φ_unif]
     with z ⟨hp, hq⟩ hΦ
   -- `z` is a pair of heads near `(p, q)`; the density at `z` is the integral of `Φ` on its sphere
@@ -627,13 +690,18 @@ lemma continuous_lastEntryDensity {F : PlaceData ι (latticeMiddleGram 𝔰 N) (
       refine integral_congr_ae (F.ae_measureH_mem_besselH.mono fun k hk ↦ ?_)
       have hkl : k * l ∈ floorGroup 𝔰.ϱ := mul_mem (floorGroup_anti 𝔰.ϱ.le_succ hk) hl
       simp only [hp _ hkl, hq _ hkl]
-    · simp [fiberPairing, h_orbit]
+    · rw [fiberPairing, fiberPairing, dite_eq_right h_orbit, dite_eq_right h_orbit]
   have h_add (x : 𝔰.κ → A) :
       vectorOfLastEntry π (p 𝔰.ϱ) x + vectorOfLastEntry π ((z.1 𝔰.ϱ : A) - p 𝔰.ϱ) (0 : 𝔰.κ → A) =
         vectorOfLastEntry π (z.1 𝔰.ϱ) x := by
     rw [vectorOfLastEntry, vectorOfLastEntry, vectorOfLastEntry, ← mulVec_add]
-    congr 1
-    simp [funext_iff, mul_sub]
+    refine congrArg _ (funext fun i ↦ ?_)
+    rcases i with i | (i | i) | i
+    · exact add_zero 0
+    · exact add_zero (x i)
+    · dsimp only [Pi.add_apply, Sum.elim_inl, Sum.elim_inr]
+      rw [mul_sub, add_sub_cancel]
+    · exact add_zero 0
   change (P.modulus π)⁻¹.toReal * ∫ x, Φ (vectorOfLastEntry π (p 𝔰.ϱ) x)
       ∂P.normFiberMeasure 𝔰.κ (lastEntrySphereIndex π (z.1 𝔰.ϱ : A)) = lastEntryDensity π Z z.1 z.2
   refine congrArg _ (integral_congr_ae ?_)
@@ -720,7 +788,7 @@ lemma sum_lastEntryDensity_nonneg_and_eq_inv_mul_lintegral
       (fun a b ↦ integrable_fiberPairing_vectorOfLastEntry Z (ω a) (ω b) hN t)
       fun x ↦ sum_fiberPairing_nonneg Z hR ω (vectorOfLastEntry π t x)
   rw [sum_lastEntryDensity_eq Z R ω ht, h_sphere, Complex.re_ofReal_mul, ofReal_mul toReal_nonneg,
-    ofReal_toReal (by simp)]
+    ofReal_toReal (ENNReal.inv_ne_top.2 (P.modulus_ne_zero π))]
 
 end IntegralPlace.IsLargeLatticeData
 
