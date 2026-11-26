@@ -280,7 +280,6 @@ lemma Modulus.liftFn_mul_blocks (e : n₁ ⊕ n₂ ≃ n) (Φ₁ : (n₁ → �
     (Φ₂ : (n₂ → 𝔪.ResidueRing) → ℂ) :
     𝔪.liftFn (fun y : n → 𝔪.ResidueRing ↦ Φ₁ (y ∘ e ∘ Sum.inl) * Φ₂ (y ∘ e ∘ Sum.inr)) =
       fun x : n → 𝔸f E ↦ 𝔪.liftFn Φ₁ (x ∘ e ∘ Sum.inl) * 𝔪.liftFn Φ₂ (x ∘ e ∘ Sum.inr) := by
-  have _ : Nonempty (Fintype n₁) ∧ Nonempty (Fintype n₂) := ⟨⟨inferInstance⟩, ⟨inferInstance⟩⟩
   funext x
   -- `x` is integral at `𝔪.places` exactly when both blocks are
   have h_int : (∀ i : n, idem 𝔪.places * x i ∈ Ô E) ↔
