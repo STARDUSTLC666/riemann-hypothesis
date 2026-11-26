@@ -559,31 +559,22 @@ lemma movedFrame_secondBlock_mul (v : G E (1 : n₂ → ℤˣ)) (h : G E (1 : n 
 
 /-- An element of `U(n₂)(𝔸)` is rational if and only if its image in `U(n)(𝔸)` is rational. -/
 lemma comap_Gamma_secondBlock : (stdSpace E n).Γ.comap (secondBlock o hs) = (stdSpace E n₂).Γ :=
-  Subgroup.ext fun _ ↦ by
-    rw [Subgroup.mem_comap, secondBlock, MonoidHom.comp_apply, MonoidHom.inr_apply,
-      blockEmb_mem_Gamma_iff, and_iff_right (one_mem _)]
+  ext (by simp [secondBlock])
 
 /-- `diag(h₁, h₂) = diag(1, h₂) diag(h₁, 1)`. -/
 lemma blockEmb_eq_secondBlock_mul (h₁ : G E (1 : n₁ → ℤˣ)) (h₂ : G E (1 : n₂ → ℤˣ)) :
     blockEmb hs (h₁, h₂) = secondBlock o hs h₂ * blockEmb hs (h₁, 1) := by
-  rw [secondBlock, MonoidHom.comp_apply, MonoidHom.inr_apply, ← (blockEmb hs).map_mul,
-    Prod.mk_mul_mk, one_mul, mul_one]
+  simp [secondBlock, ← map_mul]
 
 /-- The second block commutes with `diag(h₁, 1)⁻¹`. -/
 lemma inv_blockEmb_mul_secondBlock_mul (h₁ : G E (1 : n₁ → ℤˣ)) (v : G E (1 : n₂ → ℤˣ))
     (g : G E (1 : n → ℤˣ)) :
     (blockEmb hs (h₁, 1))⁻¹ * (secondBlock o hs v * g) =
       secondBlock o hs v * ((blockEmb hs (h₁, 1))⁻¹ * g) := by
-  rw [secondBlock, MonoidHom.comp_apply, MonoidHom.inr_apply, ← mul_assoc, ← mul_assoc]
-  refine congrArg (· * g) ?_
-  have h_inv : (blockEmb hs (h₁, 1))⁻¹ = blockEmb hs (h₁⁻¹, 1) := by
-    rw [← (blockEmb hs).map_inv, Prod.inv_mk, inv_one]
-  rw [h_inv, ← (blockEmb hs).map_mul (h₁⁻¹, 1) (1, v), ← (blockEmb hs).map_mul (1, v) (h₁⁻¹, 1)]
-  exact congrArg (blockEmb hs)
-    (Prod.ext (show h₁⁻¹ * 1 = 1 * h₁⁻¹ by rw [mul_one, one_mul])
-      (show 1 * v = v * 1 by rw [one_mul, mul_one]))
+  simp [secondBlock, ← mul_assoc, ← map_inv, ← map_mul]
 
 omit [Fintype n₁] [DecidableEq n₁] [Fintype n₂] [DecidableEq n₂] in
+/-- The inverse action on the first frame depends continuously on the group element. -/
 @[fun_prop] lemma continuous_movedFrame : Continuous (movedFrame (E := E) o) :=
   (G.continuous_adeleMatrix.comp continuous_inv).matrix_mul continuous_const
 
@@ -604,19 +595,8 @@ omit [DecidableEq n] [DecidableEq n₁] in
 have integral finite part. -/
 lemma frameWeight_ne_zero_iff [WeilData E] {x : Matrix n n₁ (𝔸 E)} :
     frameWeight x ≠ 0 ↔ ∀ (a : n) (b : n₁), (x a b).2 ∈ Ô E := by
-  rw [frameWeight, ne_eq, sq_eq_zero_iff, norm_eq_zero, vacuumFn, mul_eq_zero,
-    Complex.ofReal_eq_zero, not_or]
-  refine ⟨fun ⟨_, h⟩ a b ↦ ?_, fun h ↦ ⟨Real.exp_ne_zero _, ?_⟩⟩
-  · by_contra h_not
-    refine h (ite_eq_right fun h_all ↦ h_not ?_)
-    have h_ab := h_all (a, b)
-    rwa [Pi.smul_apply, smul_eq_mul, Prod.snd_mul, ← mul_assoc, val_scaleIdele_snd,
-      Units.inv_mul, one_mul] at h_ab
-  · rw [ite_eq_left fun p ↦ ?_]
-    · exact Circle.coe_ne_zero _
-    · rw [Pi.smul_apply, smul_eq_mul, Prod.snd_mul, ← mul_assoc, val_scaleIdele_snd,
-        Units.inv_mul, one_mul]
-      exact h p.1 p.2
+  classical
+  simp [frameWeight, vacuumFn, matrixToVec, val_scaleIdele_snd]
 
 omit [Fintype n₂] [DecidableEq n₂] in
 /-- If the slice `frameWeight` of the vacuum is not zero at the frame `h⁻¹ o₁`, then this frame is
