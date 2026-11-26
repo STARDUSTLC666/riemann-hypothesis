@@ -340,12 +340,6 @@ theorem exists_integration_by_parts (hg : l.HasLargeGap A) (hu : IsUnitaryRep A 
     rw [h_kernel]
     exact P.map_smul l.formalDegree (-l).dsGenerator
   · -- a complex matrix is `Y₁ + I • Y₂` with `Y₁`, `Y₂` in the real Lie algebra
-    have h_P_real (Z : unitaryLie (signMatrix ε)) :
-        P f (ι (ρ Z v)) = -P ((-l).dsAction Z f) (ι v) := by
-      change integratedRep π f.val.val (ι (ρ Z v)) =
-        -integratedRep π ((-l).dsAction Z f).val.val (ι v)
-      rw [h_apply, h_apply]
-      exact h_real Z f v
     have h_P : P f (ι (ρ Y v)) = -P ((-l).dsAction Y f) (ι v) := by
       rw [eq_unitaryLiePart_add_I_smul ε Y]
       -- expand both sides by linearity and use `h_real` on `Y₁` and `Y₂`
