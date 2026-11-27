@@ -548,6 +548,8 @@ private lemma homBicharacter_mul_eichlerMap (V : Space E ι ε) (V' : Space E ι
         (y * eichlerMap (V.J.map toAdele) v x (toAdele 2⁻¹ * star x ⬝ᵥ V.J.map toAdele *ᵥ x)) y =
       stdAddChar E (toAdele j * star x ⬝ᵥ (yᴴ * V'.J.map toAdele * y) *ᵥ v) := by
   let u := eichlerMap (V.J.map toAdele) v x (toAdele 2⁻¹ * star x ⬝ᵥ V.J.map toAdele *ᵥ x)
+  -- `stdAddChar a` depends only on `a + star a` (`stdAddChar_inv_two_mul_add_star`); compare these
+  -- sums.
   suffices h_sum : toAdele ((j : E) / 2) * (V.formAdjoint V' y * (y * u)).trace +
         star (toAdele ((j : E) / 2) * (V.formAdjoint V' y * (y * u)).trace) =
       toAdele (j : E) * star x ⬝ᵥ (yᴴ * V'.J.map toAdele * y) *ᵥ v +
@@ -577,6 +579,8 @@ private lemma hasDegreeGe_eichlerMap_sub_one_and_mul (w : Matrix ι' ι (𝔸 E)
     let u := eichlerMap (V.J.map toAdele) v x (toAdele 2⁻¹ * star x ⬝ᵥ V.J.map toAdele *ᵥ x)
     HasDegreeGe Y.gradeOf Y.gradeOf 2 (u - 1) ∧ HasDegreeGe D Y.gradeOf 1 (w * (u - 1)) := by
   intro x u
+  -- The entries are terms in `v`, `x` and `w *ᵥ v` at weights that `hv`, `hwv` and `hw_col`
+  -- exclude.
   simp [u, Y.vecMul_J_apply, vecMulVec_apply, x, -single_vecMul, Pi.single_apply,
     Matrix.one_apply, sub_eq_zero, Matrix.mulVec_add, Matrix.mulVec_smul, Matrix.mul_sub,
     Matrix.mul_add, HasDegreeGe, eichlerMap, mul_vecMulVec]
